@@ -25,6 +25,7 @@ Thumbs.db
 data/input/*
 data/output/*
 data/checkpoints/*
+标书智能审核系统-架构设计文档-v2.md
 # 但保留目录结构
 !data/input/.gitkeep
 !data/output/.gitkeep

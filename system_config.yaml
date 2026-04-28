@@ -1,0 +1,51 @@
+# 所有 Agent 共享的全局配置
+
+# 系统信息
+system:
+  name: "标书智能审核系统"
+  version: "2.1"
+  description: "基于大模型的标书多维度智能审核平台"
+
+# 全局审核规范 - 所有 Agent 必须遵守
+global_rules:
+  - "只报告有明确证据的问题，禁止猜测"
+  - "每个 issue 必须引用原文证据"
+  - "confidence < 0.7 的问题标记为 needs_verification"
+  - "禁止重复报告同一问题"
+  - "严重程度必须基于实际影响判断，不夸大不缩小"
+
+# 模型配置
+models:
+  reasoning:
+    name: "qwen-max"
+    description: "高质量推理，用于复杂判断"
+  fast:
+    name: "qwen-turbo"
+    description: "快速处理，用于信息压缩"
+
+# 审核维度
+dimensions:
+  completeness:
+    name: "完整性"
+    enabled: true
+    priority: "高"
+  compliance:
+    name: "合规性"
+    enabled: true
+    priority: "高"
+  price:
+    name: "报价"
+    enabled: true
+    priority: "中"
+  risk:
+    name: "风险"
+    enabled: true
+    priority: "中"
+
+# 评分配置
+scoring:
+  base_score: 100
+  severity_deduction:
+    高: 15
+    中: 5
+    低: 1

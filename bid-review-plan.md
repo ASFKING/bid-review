@@ -390,7 +390,7 @@ Phase 10：整合测试 + 优化
 | 1.3  | ✅  | 2026-04-28 | dataclass + models/schemas.py（15个数据类）  |
 | 1.4  | ✅  | 2026-04-28 | config.py 配置加载器（@property + Path + 单例） |
 | 2.1  | ✅  | 2026-04-28 | python-docx 基础：读取 Word 段落              |
-| 2.2  | ⬜  | <br />     | <br />                                 |
+| 2.2  | ✅  | 2026-04-29 | 提取章节结构：_get_heading_level + extract_sections + 栈组装树 |
 | 2.3  | ⬜  | <br />     | <br />                                 |
 | 2.4  | ⬜  | <br />     | <br />                                 |
 | 3.1  | ⬜  | <br />     | <br />                                 |

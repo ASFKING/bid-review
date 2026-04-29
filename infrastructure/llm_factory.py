@@ -56,6 +56,7 @@ def get_llm(model_name: str = None):
         api_key=api_key,
         temperature=0.1,   # 温度越低越稳定，审核任务需要稳定性
         max_tokens=4096,   # 最大输出 token 数
+        is_chat_model=True   
     )
 
     return llm

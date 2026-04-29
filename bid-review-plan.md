@@ -165,6 +165,7 @@ Phase 10：整合测试 + 优化
 - **验证：** 能发一条消息给 LLM 并收到回复
 - **预计时间：** 20 分钟
 - **前置：** 需要有 Qwen 或 DeepSeek 的 API Key
+- **官网地址：** (https://help.aliyun.com/zh/model-studio/dashscopellm-in-llamaindex)
 
 #### Step 3.3 LLM 调用包装器
 

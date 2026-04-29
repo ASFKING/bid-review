@@ -3,7 +3,179 @@
 
 from docx import Document                          # python-docx 的核心类
 from docx.text.paragraph import Paragraph           # 段落类型，用于类型判断
+from docx.table import Table                         # 表格类型，用于类型判断
 from models.schemas import Section, TableData       # 我们在 Step 1.3 定义的数据结构
+
+
+# ===== Step 2.3 新增：提取表格数据 =====
+
+def _table_to_text(table: Table) -> str:
+    """
+    把一个表格转成"纯文本版"，方便 LLM 阅读
+
+    生活比喻：把 Excel 表格打印成一页纸——每行占一行，列之间用 | 分隔
+
+    为什么需要这个？LLM 不认识表格对象，它只认识文本。
+    我们把表格转成类似 Markdown 表格的格式，LLM 一看就懂。
+
+    参数：
+        table: python-docx 的表格对象
+
+    返回：
+        表格的文本表示，如：
+        序号 | 设备名称 | 数量 | 单价
+        1 | 服务器 | 10 | 50000
+        2 | 交换机 | 5 | 8000
+    """
+    lines = []  # 存储每一行的文本
+
+    for i, row in enumerate(table.rows):
+        # 提取这一行每个单元格的文本，去掉首尾空格
+        cells = [cell.text.strip() for cell in row.cells]
+        # 用 " | " 把单元格内容拼起来
+        line = " | ".join(cells)
+        lines.append(line)
+
+        # 第一行（表头）后面加一条分隔线，类似 Markdown 表格
+        if i == 0:
+            # 生成 "--- | --- | ---" 这样的分隔线
+            separator = " | ".join(["---"] * len(cells))
+            lines.append(separator)
+
+    return "\n".join(lines)
+
+
+def extract_tables(file_path: str) -> list[TableData]:
+    """
+    从 Word 文档中提取所有表格
+
+    生活比喻：把菜单上所有的价目表都抄下来，注明来源在"第几页"
+
+    为什么不用 Document.tables？
+    因为 Document.tables 只给你表格对象，不告诉你它在文档的哪个位置。
+    我们需要遍历文档的 body element，才能知道表格出现在哪个章节附近。
+
+    这里用一个简化方案：遍历 Document.tables，同时记录表格序号
+    后面在 extract_sections 中，我们会把表格"挂"到对应的章节上。
+
+    参数：
+        file_path: Word 文件的路径
+
+    返回：
+        TableData 列表
+    """
+    doc = Document(file_path)
+    tables_data: list[TableData] = []
+
+    for i, table in enumerate(doc.tables):
+        # 1. 提取表头（第一行）
+        headers = []
+        if table.rows:
+            headers = [cell.text.strip() for cell in table.rows[0].cells]
+
+        # 2. 提取数据行（第二行开始）
+        rows = []
+        for row in table.rows[1:]:
+            row_data = [cell.text.strip() for cell in row.cells]
+            rows.append(row_data)
+
+        # 3. 生成文本版
+        as_text = _table_to_text(table)
+
+        # 4. 暂时用表格序号作为 location，后面会修正
+        location = f"表格 #{i + 1}"
+
+        # 5. 组装成 TableData 对象
+        table_data = TableData(
+            headers=headers,
+            rows=rows,
+            as_text=as_text,
+            location=location
+        )
+        tables_data.append(table_data)
+
+    return tables_data
+
+
+def extract_tables_with_context(file_path: str) -> list[TableData]:
+    """
+    提取表格，并尝试推断每个表格所在的章节位置
+
+    生活比喻：不仅抄了价目表，还标注了"这张表在菜单的哪个板块下面"
+
+    核心思路：遍历文档的所有 body 元素（段落和表格交替出现），
+    维护一个"当前最近的标题"变量，遇到表格时就把当前标题作为它的 location。
+
+    参数：
+        file_path: Word 文件的路径
+
+    返回：
+        带有 location 信息的 TableData 列表
+    """
+    doc = Document(file_path)
+    tables_data: list[TableData] = []
+
+    # 当前最近的标题，用来标记表格属于哪个章节
+    current_heading = "文档开头"
+
+    # 表格索引——因为 doc.tables 是纯表格列表，
+    # 我们需要知道当前处理的是第几个表格
+    table_index = 0
+
+    # 遍历文档 body 的所有子元素
+    # doc.element.body 是底层的 XML 元素
+    # iterchildren() 按顺序遍历所有子节点（段落和表格交替出现）
+    for child in doc.element.body.iterchildren():
+        # 判断这个子元素是段落还是表格
+        # python-docx 用不同的 XML tag 区分：
+        #   <w:p> = 段落（paragraph）
+        #   <w:tbl> = 表格（table）
+        tag = child.tag.split('}')[-1] if '}' in child.tag else child.tag
+
+        if tag == 'p':
+            # 这是一个段落——检查它是不是标题
+            # 需要从 XML 元素还原回 Paragraph 对象
+            # python-docx 提供了 CT_P → Paragraph 的方式
+            para = Paragraph(child, doc)
+            text = para.text.strip()
+
+            if text and _get_heading_level(para) is not None:
+                # 是标题，更新 current_heading
+                current_heading = text
+
+        elif tag == 'tbl':
+            # 这是一个表格——提取数据
+            if table_index < len(doc.tables):
+                table = doc.tables[table_index]
+
+                # 提取表头
+                headers = []
+                if table.rows:
+                    headers = [cell.text.strip() for cell in table.rows[0].cells]
+
+                # 提取数据行
+                rows = []
+                for row in table.rows[1:]:
+                    row_data = [cell.text.strip() for cell in row.cells]
+                    rows.append(row_data)
+
+                # 生成文本版
+                as_text = _table_to_text(table)
+
+                # 用当前标题作为 location
+                location = current_heading
+
+                table_data = TableData(
+                    headers=headers,
+                    rows=rows,
+                    as_text=as_text,
+                    location=location
+                )
+                tables_data.append(table_data)
+
+                table_index += 1
+
+    return tables_data
 
 
 # ===== Step 2.1 的函数：读取所有段落 =====
@@ -178,3 +350,27 @@ if __name__ == "__main__":
 
     print(f"\n共找到 {len(sections)} 个顶层章节：\n")
     print_section_tree(sections)
+
+    print("\n" + "=" * 60)
+    print("Step 2.3 测试：提取表格数据")
+    print("=" * 60)
+
+    # 测试基础表格提取
+    tables = extract_tables(file_path)
+    print(f"\n共找到 {len(tables)} 个表格：\n")
+    for i, table in enumerate(tables):
+        print(f"--- 表格 #{i + 1} ---")
+        print(f"表头: {table.headers}")
+        print(f"数据行数: {len(table.rows)}")
+        print(f"文本预览:\n{table.as_text[:300]}...")
+        print()
+
+    # 测试带章节定位的表格提取
+    print("=" * 60)
+    print("Step 2.3 进阶测试：带章节定位的表格提取")
+    print("=" * 60)
+
+    tables_with_ctx = extract_tables_with_context(file_path)
+    print(f"\n共找到 {len(tables_with_ctx)} 个表格（带位置信息）：\n")
+    for i, table in enumerate(tables_with_ctx):
+        print(f"  表格 #{i + 1} | 所在章节: {table.location} | 表头: {table.headers[:3]}...")

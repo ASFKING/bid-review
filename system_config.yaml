@@ -17,7 +17,7 @@ global_rules:
 # 模型配置
 models:
   reasoning:
-    name: "qwen-max"
+    name: "qwen3.6-plus"
     description: "高质量推理，用于复杂判断"
   fast:
     name: "qwen-turbo"

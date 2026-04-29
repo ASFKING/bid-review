@@ -6,7 +6,7 @@
 #   python test_llm.py
 
 from infrastructure.llm_factory import get_reasoning_llm, get_fast_llm
-
+from llama_index.core.llms import ChatMessage
 
 def test_basic_call():
     """
@@ -22,7 +22,8 @@ def test_basic_call():
         llm = get_reasoning_llm()
 
         # 发送一条简单消息
-        response = llm.chat("你好，请用一句话介绍你自己。")
+        message = ChatMessage(role="user", content="你好，请用一句话介绍你自己。")
+        response = llm.chat([message])
 
         print(f"✅ 调用成功！")
         print(f"📨 回复内容：{response.message.content[:200]}")
@@ -47,7 +48,8 @@ def test_fast_model():
 
     try:
         llm = get_fast_llm()
-        response = llm.chat("用一句话说：1+1等于几？")
+        message = ChatMessage(role="user", content="用一句话说：1+1等于几？")
+        response = llm.chat([message])
         print(f"✅ 调用成功！")
         print(f"📨 回复内容：{response.message.content[:200]}")
 

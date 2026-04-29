@@ -128,6 +128,32 @@ class Config:
         """
         return self._data["scoring"]["severity_deduction"]
 
+    @property
+    def llm_resilience(self) -> dict:
+        """
+        LLM 容错配置——控制重试、超时、JSON 修复等策略
+
+        类比：潜水器的应急系统参数——氧气瓶容量、备用电源时长
+
+        返回格式：
+        {
+            "max_retries": 2,
+            "retry_delays": [2, 4],
+            "timeout_seconds": 60,
+            "rate_limit_max_wait": 30,
+            "json_repair": True
+        }
+
+        注意：用 .get() 取值并提供默认值，这样旧配置文件没有这个字段也不会报错
+        """
+        return self._data.get("llm_resilience", {
+            "max_retries": 2,
+            "retry_delays": [2, 4],
+            "timeout_seconds": 60,
+            "rate_limit_max_wait": 30,
+            "json_repair": True,
+        })
+
     def get(self, key: str, default: Any = None) -> Any:
         """
         安全地获取配置项（类似字典的 .get() 方法）

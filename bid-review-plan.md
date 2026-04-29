@@ -395,7 +395,7 @@ Phase 10：整合测试 + 优化
 | 2.4  | ✅  | 2026-04-29 | DocumentLoader 类：_collect_full_text + _count_sections + _attach_tables + load() |
 | 3.1  | ✅  | 2026-04-29 | 理解 LlamaIndex 核心概念：Document、Node、Index、LLM |
 | 3.2  | ✅  | 2026-04-29 | 配置 LLM：llm_factory.py（get_reasoning_llm / get_fast_llm）+ .env |
-| 3.3  | ⬜  | <br />     | <br />                                 |
+| 3.3  | ✅  | 2026-04-29 | llm_caller.py（重试/超时/JSON修复/限流/调用日志）+ system_config.yaml 加 llm_resilience + platform→platform_layer 改名 |
 | 3.4  | ⬜  | <br />     | <br />                                 |
 | 4.1  | ⬜  | <br />     | <br />                                 |
 | 4.2  | ⬜  | <br />     | <br />                                 |

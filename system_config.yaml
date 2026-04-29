@@ -49,3 +49,12 @@ scoring:
     高: 15
     中: 5
     低: 1
+
+# LLM 容错配置——控制调用大模型时的重试、超时、修复策略
+# 类比：潜水器的应急系统——氧气不够了自动切换备用瓶
+llm_resilience:
+  max_retries: 2                    # 最多重试 2 次（加上首次调用，总共最多 3 次）
+  retry_delays: [2, 4]              # 每次重试前等待的秒数（指数退避）
+  timeout_seconds: 60               # 单次调用超时秒数
+  rate_limit_max_wait: 30           # 遇到 429 限流时，最多等待 30 秒
+  json_repair: true                 # 启用 JSON 自动修复

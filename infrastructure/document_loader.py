@@ -4,7 +4,7 @@
 from docx import Document                          # python-docx 的核心类
 from docx.text.paragraph import Paragraph           # 段落类型，用于类型判断
 from docx.table import Table                         # 表格类型，用于类型判断
-from models.schemas import Section, TableData       # 我们在 Step 1.3 定义的数据结构
+from models.schemas import Section, TableData, ParsedDocument  # Step 2.4: 加入 ParsedDocument
 
 
 # ===== Step 2.3 新增：提取表格数据 =====
@@ -338,6 +338,158 @@ def print_section_tree(sections: list[Section], indent: int = 0) -> None:
         print_section_tree(section.children, indent + 1)
 
 
+# ===== Step 2.4 新增：DocumentLoader 类（一键解析）=====
+
+def _collect_full_text(sections: list[Section]) -> str:
+    """
+    递归收集所有章节的正文文本，拼成一份完整的全文
+
+    生活比喻：把目录树里每一页的内容按顺序抄到一张长纸上
+
+    为什么需要？后面 LLM 做行业分析时需要看全文，
+    而且 ParsedDocument 也需要 full_text 字段。
+
+    参数：
+        sections: 章节树（可能有嵌套的 children）
+
+    返回：
+        拼接后的全文文本
+    """
+    parts = []
+    for section in sections:
+        # 加上这个章节的正文
+        if section.content.strip():
+            parts.append(section.content)
+        # 递归收集子章节的正文
+        if section.children:
+            parts.append(_collect_full_text(section.children))
+    return "\n".join(parts)
+
+
+def _count_sections(sections: list[Section]) -> int:
+    """
+    递归统计章节总数（包括子章节）
+
+    生活比喻：数一数目录树里一共有多少个节点
+    """
+    count = 0
+    for section in sections:
+        count += 1  # 当前章节
+        if section.children:
+            count += _count_sections(section.children)  # 子章节
+    return count
+
+
+def _attach_tables_to_sections(sections: list[Section], tables: list[TableData]) -> None:
+    """
+    把表格"挂"到对应的章节上
+
+    生活比喻：把抄好的价目表放回菜单对应的板块下面
+
+    核心逻辑：
+    - 遍历每个表格，看它的 location 是否包含某个章节的 title
+    - 如果匹配上了，就把这个表格加到那个章节的 tables 列表里
+    - 匹配策略：location 包含 section.title，或 section.title 包含 location
+
+    参数：
+        sections: 章节树
+        tables: 带 location 的表格列表
+    """
+    for table in tables:
+        # 递归查找匹配的章节
+        _find_and_attach(sections, table)
+
+
+def _find_and_attach(sections: list[Section], table: TableData) -> bool:
+    """
+    递归查找并把表格挂到匹配的章节上
+
+    返回：True 表示找到了匹配的章节，False 表示没找到
+    """
+    for section in sections:
+        # 匹配策略：双向包含检查
+        # 因为 location 可能是"第六章 报价清单"，而 section.title 是"报价清单"
+        if (table.location in section.title or
+                section.title in table.location or
+                table.location == section.title):
+            section.tables.append(table)
+            return True
+
+        # 递归查找子章节
+        if section.children:
+            if _find_and_attach(section.children, table):
+                return True
+
+    return False
+
+
+class DocumentLoader:
+    """
+    文档加载器——一键把 Word 文件变成 ParsedDocument
+
+    生活比喻：全自动洗碗机——你把脏碗放进去，按一个按钮，
+    出来就是干净的碗。你不需要管里面经历了冲洗、烘干、消毒。
+
+    用法：
+        loader = DocumentLoader()
+        doc = loader.load("data/input/标书.docx")
+        print(doc.filename)          # 文件名
+        print(len(doc.sections))     # 章节数
+        print(doc.full_text[:200])   # 全文前 200 字
+    """
+
+    def load(self, file_path: str) -> ParsedDocument:
+        """
+        加载 Word 文件，返回完整的 ParsedDocument
+
+        内部流程：
+        1. 提取章节结构（extract_sections）
+        2. 提取表格并定位（extract_tables_with_context）
+        3. 把表格挂到对应章节上
+        4. 收集全文文本
+        5. 组装成 ParsedDocument
+
+        参数：
+            file_path: Word 文件路径
+
+        返回：
+            ParsedDocument 对象
+        """
+        import os
+
+        # 第一步：提取章节结构
+        sections = extract_sections(file_path)
+
+        # 第二步：提取表格（带位置信息）
+        tables = extract_tables_with_context(file_path)
+
+        # 第三步：把表格挂到对应章节上
+        _attach_tables_to_sections(sections, tables)
+
+        # 第四步：收集全文文本
+        full_text = _collect_full_text(sections)
+
+        # 第五步：统计信息
+        total_sections = _count_sections(sections)
+        filename = os.path.basename(file_path)
+
+        # 第六步：组装成 ParsedDocument
+        parsed_doc = ParsedDocument(
+            filename=filename,
+            total_pages=0,  # python-docx 无法直接获取页数，暂设为 0
+            sections=sections,
+            full_text=full_text,
+            metadata={
+                "file_path": file_path,
+                "total_sections": total_sections,
+                "total_tables": len(tables),
+                "total_chars": len(full_text),
+            }
+        )
+
+        return parsed_doc
+
+
 # ===== 测试代码 =====
 if __name__ == "__main__":
     file_path = "data/input/【定稿0424】湖北省医疗器械综合监管建设.docx"
@@ -374,3 +526,25 @@ if __name__ == "__main__":
     print(f"\n共找到 {len(tables_with_ctx)} 个表格（带位置信息）：\n")
     for i, table in enumerate(tables_with_ctx):
         print(f"  表格 #{i + 1} | 所在章节: {table.location} | 表头: {table.headers[:3]}...")
+
+    print("\n" + "=" * 60)
+    print("Step 2.4 测试：DocumentLoader 一键解析")
+    print("=" * 60)
+
+    loader = DocumentLoader()
+    doc = loader.load(file_path)
+
+    print(f"\n📄 文件名: {doc.filename}")
+    print(f"📊 总章节数: {doc.metadata['total_sections']}")
+    print(f"📋 总表格数: {doc.metadata['total_tables']}")
+    print(f"📝 全文字符数: {doc.metadata['total_chars']}")
+    print(f"\n🌳 章节树（前 5 个顶层章节）：")
+    for section in doc.sections[:5]:
+        tables_count = len(section.tables)
+        print(f"  [{section.level}] {section.title[:50]}  （含 {tables_count} 个表格）")
+        for child in section.children[:3]:
+            child_tables = len(child.tables)
+            print(f"      [{child.level}] {child.title[:50]}  （含 {child_tables} 个表格）")
+
+    print(f"\n📖 全文预览（前 200 字）：")
+    print(doc.full_text[:200])

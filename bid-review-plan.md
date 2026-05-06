@@ -398,9 +398,9 @@ Phase 10：整合测试 + 优化
 | 3.2  | ✅  | 2026-04-29 | 配置 LLM：llm_factory.py（get_reasoning_llm / get_fast_llm）+ .env |
 | 3.3  | ✅  | 2026-04-29 | llm_caller.py（重试/超时/JSON修复/限流/调用日志）+ system_config.yaml 加 llm_resilience + platform→platform_layer 改名 |
 | 3.4  | ✅ | 2026-05-06    | 结构化输出处理                               |
-| 4.1  | ⬜  | <br />     | <br />                                 |
-| 4.2  | ⬜  | <br />     | <br />                                 |
-| 4.3  | ⬜  | <br />     | <br />                                 |
+| 4.1  | ✅ | 2026-05-06 | 理解 Skill 概念：Skill vs Claude Code Skill vs Prompt 模板，设计模式分析（Strategy/Template Method/Facade） |
+| 4.2  | ✅ | 2026-05-06 | completeness_skill.py：完整性维度专家知识 + build_completeness_prompt（复用 build_structured_review_prompt） |
+| 4.3  | ✅ | 2026-05-06 | review_agent.py：ReviewAgent 基类 + 复用 output_parser.py（IssueOutput→Issue 转换） + 评分/风险评估 |
 | 4.4  | ⬜  | <br />     | <br />                                 |
 | 4.5  | ⬜  | <br />     | <br />                                 |
 | 5.1  | ⬜  | <br />     | <br />                                 |

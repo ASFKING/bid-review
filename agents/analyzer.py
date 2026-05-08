@@ -6,7 +6,9 @@
 # 2. 根据聚餐类型，安排今天的菜单和人手分工（生成审核配方）
 #
 # 工作流程：
-#   ParsedDocument → 提取标题 → LLM 分析行业 → LLM 生成配方 → ReviewRecipe
+#   投标文件（ParsedDocument） → 提取标题 → LLM 分析行业 → LLM 生成配方 → ReviewRecipe
+#
+# 注意：分析的对象是「投标文件」（乙方提交的答卷），不是「招标文件」（甲方出的考题）
 
 import logging                                     # 日志记录
 from models.schemas import (                       # 数据结构
@@ -26,14 +28,14 @@ logger = logging.getLogger(__name__)
 
 class Analyzer:
     """
-    Analyzer Agent——分析文档行业类型，生成审核配方
+    Analyzer Agent——分析投标文件的行业类型，生成审核配方
 
     为什么需要它？
-    不同行业的标书审核重点不同：
+    不同行业的投标文件，审核重点不同：
     - 软件标关注技术方案、团队资质
     - 建筑标关注安全资质、施工方案
     - 医疗标关注设备认证、临床数据
-    Analyzer 让系统能"看一眼标书就知道该怎么审"。
+    Analyzer 让系统能"看一眼投标文件就知道该怎么审"。
 
     技术上做两次 LLM 调用：
     第一次：看标题 → 判断行业
@@ -51,16 +53,16 @@ class Analyzer:
 
     def analyze(self, document: ParsedDocument) -> ReviewRecipe:
         """
-        分析文档，生成审核配方
+        分析投标文件，生成审核配方
 
         这是 Analyzer 的核心方法，完整流程：
-        1. 从文档中提取章节标题
+        1. 从投标文件中提取章节标题
         2. 调用 LLM 分析行业类型
         3. 调用 LLM 生成审核配方
         4. 组装并返回 ReviewRecipe
 
         参数：
-            document: 解析后的文档对象
+            document: 解析后的投标文件对象
 
         返回：
             ReviewRecipe 审核配方

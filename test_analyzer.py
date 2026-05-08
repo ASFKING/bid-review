@@ -5,7 +5,7 @@
 #
 # 前置条件：
 # 1. .env 文件中有 DASHSCOPE_API_KEY
-# 2. data/input/ 目录下有一份 .docx 标书文件
+# 2. data/input/ 目录下有一份 .docx 投标文件
 
 import sys
 import logging
@@ -33,12 +33,12 @@ def main():
     from infrastructure.llm_caller import LLMCaller
     from agents.analyzer import Analyzer
 
-    # 查找标书文件
+    # 查找投标文件
     input_dir = Path("data/input")
     docx_files = list(input_dir.glob("*.docx")) if input_dir.exists() else []
 
     if not docx_files:
-        logger.error("❌ 找不到标书文件！请把 .docx 文件放到 data/input/ 目录下")
+        logger.error("❌ 找不到投标文件！请把 .docx 文件放到 data/input/ 目录下")
         sys.exit(1)
 
     docx_path = docx_files[0]

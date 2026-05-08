@@ -8,7 +8,7 @@
 
 def build_industry_analysis_prompt(section_titles: list[str]) -> str:
     """
-    第一次 LLM 调用：分析文档所属行业
+    第一次 LLM 调用：分析投标文件所属行业
 
     为什么只需要标题？
     就像你判断一家餐厅是什么菜系，看菜单标题就够了——
@@ -16,7 +16,7 @@ def build_industry_analysis_prompt(section_titles: list[str]) -> str:
     不需要把每道菜都吃一遍。
 
     参数：
-        section_titles: 文档的所有章节标题（平铺列表）
+        section_titles: 投标文件的所有章节标题（平铺列表）
 
     返回：
         Prompt 字符串
@@ -24,10 +24,10 @@ def build_industry_analysis_prompt(section_titles: list[str]) -> str:
     # 把标题列表格式化成编号文本
     titles_text = "\n".join(f"  {i+1}. {title}" for i, title in enumerate(section_titles))
 
-    prompt = f"""你是一位资深的招投标行业专家，能通过标书目录结构快速判断所属行业。
+    prompt = f"""你是一位资深的招投标行业专家，能通过投标文件的目录结构快速判断所属行业。
 
 ## 任务
-分析以下标书的章节标题，判断它属于什么行业。
+分析以下投标文件的章节标题，判断它属于什么行业。
 
 ## 章节标题
 {titles_text}
@@ -67,7 +67,7 @@ def build_recipe_generation_prompt(
     参数：
         industry: 行业大类，如 "软件"
         sub_industry: 细分行业，如 "信息系统集成"
-        section_titles: 文档的章节标题列表
+        section_titles: 投标文件的章节标题列表
         available_dimensions: 可用的审核维度配置（从 system_config.yaml 读取）
 
     返回：
@@ -84,16 +84,16 @@ def build_recipe_generation_prompt(
     prompt = f"""你是一位资深的标书审核架构师，负责为标书审核系统设计审核方案。
 
 ## 背景
-已判断该标书属于：{industry} - {sub_industry}
+已判断该投标文件属于：{industry} - {sub_industry}
 
-## 标书章节标题
+## 投标文件章节标题
 {titles_text}
 
 ## 可用的审核维度
 {dimensions_text}
 
 ## 任务
-根据标书的行业类型和章节结构，设计一套审核方案，包括：
+根据投标文件的行业类型和章节结构，设计一套审核方案，包括：
 1. 为每个启用的审核维度配置关注点（focus_areas）和关联章节关键词（section_keywords）
 2. 为每个审核维度定义一个 Agent
 

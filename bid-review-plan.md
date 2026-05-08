@@ -402,7 +402,7 @@ Phase 10：整合测试 + 优化
 | 4.2  | ✅ | 2026-05-06 | completeness_skill.py：完整性维度专家知识 + build_completeness_prompt（复用 build_structured_review_prompt） |
 | 4.3  | ✅ | 2026-05-06 | review_agent.py：ReviewAgent 基类 + 复用 output_parser.py（IssueOutput→Issue 转换） + 评分/风险评估 |
 | 4.4  | ✅ | 2026-05-08 | 单章节审核流程：review_section 完整链路验证通过（Skill→LLM→parser→Issue） |
-| 4.5  | ⬜  | <br />     | <br />                                 |
+| 4.5  | ✅ | 2026-05-08 | 全文审核测试通过：review_document 遍历章节 + 汇总 ReviewResult |
 | 5.1  | ⬜  | <br />     | <br />                                 |
 | 5.2  | ⬜  | <br />     | <br />                                 |
 | 5.3  | ⬜  | <br />     | <br />                                 |

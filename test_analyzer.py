@@ -57,11 +57,11 @@ def main():
     logger.info(f"📄 投标文件：{bid_path.name}")
 
     # 解析文档
-    tender_loader = DocumentLoader(str(tender_path))
-    tender_doc = tender_loader.load()
+    tender_loader = DocumentLoader()
+    tender_doc = tender_loader.load(str(tender_path))
 
-    bid_loader = DocumentLoader(str(bid_path))
-    bid_doc = bid_loader.load()
+    bid_loader = DocumentLoader()
+    bid_doc = bid_loader.load(str(bid_path))
 
     logger.info(f"✅ 招标文件：{len(tender_doc.sections)} 个章节")
     logger.info(f"✅ 投标文件：{len(bid_doc.sections)} 个章节")

@@ -1,140 +1,120 @@
 # prompts/analyzer_prompt.py
-# Analyzer Agent 的 Prompt 模板——行业分析 + 配方生成
+# Analyzer Agent 的 Prompt 模板——分析招标文件，生成审核配方
+#
+# 核心思路变了：
+# 旧设计：看投标文件 → 推断行业 → 生成配方（多余操作）
+# 新设计：看招标文件 → 提取要求和评分标准 → 生成精确的审核配方
 #
 # 生活比喻：
-# 第一次调用 = 服务员看客人穿什么衣服，判断是商务宴请还是朋友聚餐
-# 第二次调用 = 厨师长根据聚餐类型，安排今天的菜单和人手分工
+# 招标文件 = 考试大纲（告诉你考什么、怎么评分）
+# Analyzer = 教研组（看完大纲后，安排哪些老师阅卷、每个人批改什么）
 
 
-def build_industry_analysis_prompt(section_titles: list[str]) -> str:
+def build_tender_analysis_prompt(tender_full_text: str) -> str:
     """
-    第一次 LLM 调用：分析投标文件所属行业
+    分析招标文件，提取审核要求并生成审核配方
 
-    为什么只需要标题？
-    就像你判断一家餐厅是什么菜系，看菜单标题就够了——
-    "宫保鸡丁"是中餐，"寿司拼盘"是日料。
-    不需要把每道菜都吃一遍。
-
-    参数：
-        section_titles: 投标文件的所有章节标题（平铺列表）
-
-    返回：
-        Prompt 字符串
-    """
-    # 把标题列表格式化成编号文本
-    titles_text = "\n".join(f"  {i+1}. {title}" for i, title in enumerate(section_titles))
-
-    prompt = f"""你是一位资深的招投标行业专家，能通过投标文件的目录结构快速判断所属行业。
-
-## 任务
-分析以下投标文件的章节标题，判断它属于什么行业。
-
-## 章节标题
-{titles_text}
-
-## 输出要求
-只输出 JSON，不要输出任何其他文字。
-
-```json
-{{
-  "industry": "行业大类，如：软件、建筑、医疗、教育、物流、制造",
-  "sub_industry": "细分行业，如：信息系统集成、土建工程、医疗设备采购",
-  "confidence": 0.0到1.0之间的置信度,
-  "reasoning": "判断依据，简要说明从哪些标题看出的"
-}}
-```
-
-请开始分析："""
-
-    return prompt
-
-
-def build_recipe_generation_prompt(
-    industry: str,
-    sub_industry: str,
-    section_titles: list[str],
-    available_dimensions: dict[str, dict],
-) -> str:
-    """
-    第二次 LLM 调用：根据行业生成审核配方
+    这是 Analyzer 的唯一一次 LLM 调用。
+    招标文件包含了所有信息：行业、评分标准、资质要求、技术规格……
+    不需要再从投标文件推断行业了。
 
     生活比喻：
-    厨师长知道今天是"商务宴请"后，决定：
-    - 需要几个服务员？（几个 Agent）
-    - 每个服务员负责什么？（审核维度）
-    - 每个人重点关注什么？（focus_areas）
+    教研组拿到考试大纲后，一次会议就确定：
+    - 这是数学考试（行业已知）
+    - 选择题占 30 分、填空题占 20 分、大题占 50 分（评分标准）
+    - 张老师批选择题、李老师批大题（Agent 分工）
 
     参数：
-        industry: 行业大类，如 "软件"
-        sub_industry: 细分行业，如 "信息系统集成"
-        section_titles: 投标文件的章节标题列表
-        available_dimensions: 可用的审核维度配置（从 system_config.yaml 读取）
+        tender_full_text: 招标文件的全文内容
 
     返回：
         Prompt 字符串
     """
-    titles_text = "\n".join(f"  {i+1}. {title}" for i, title in enumerate(section_titles))
+    prompt = f"""你是一位资深的招投标审核架构师。你的任务是分析招标文件，设计一套审核方案。
 
-    # 把可用维度格式化成说明文本
-    dim_lines = []
-    for key, dim in available_dimensions.items():
-        dim_lines.append(f"  - {key}（{dim['name']}）：优先级 {dim['priority']}")
-    dimensions_text = "\n".join(dim_lines)
+## 招标文件全文
+{tender_full_text}
 
-    prompt = f"""你是一位资深的标书审核架构师，负责为标书审核系统设计审核方案。
+## 你的任务
 
-## 背景
-已判断该投标文件属于：{industry} - {sub_industry}
+仔细阅读招标文件，完成以下两件事：
 
-## 投标文件章节标题
-{titles_text}
+### 第一步：提取关键信息
+1. **行业类型**：判断这是什么行业的招标（软件、建筑、医疗、教育等）
+2. **评分标准**：招标文件中明确的评分规则和权重
+3. **资质要求**：投标方必须具备的资质证书、业绩要求等
+4. **技术规格**：对技术方案的具体要求
+5. **商务条款**：付款方式、交货期、违约责任等
+6. **必须提供的材料**：投标文件中必须包含的内容
 
-## 可用的审核维度
-{dimensions_text}
-
-## 任务
-根据投标文件的行业类型和章节结构，设计一套审核方案，包括：
-1. 为每个启用的审核维度配置关注点（focus_areas）和关联章节关键词（section_keywords）
-2. 为每个审核维度定义一个 Agent
-
-## 设计原则
-- focus_areas：根据该行业的特点，列出该维度需要重点关注的方面（3-6 个）
-- section_keywords：列出与该维度相关的章节标题关键词（用于后续定位相关章节）
-- 每个 Agent 要有清晰的职责描述
+### 第二步：设计审核方案
+根据提取的信息，设计审核维度和 Agent。每个维度要根据招标文件的具体要求来配置关注点（focus_areas），而不是泛泛而谈。
 
 ## 输出要求
 只输出 JSON，不要输出任何其他文字。
 
 ```json
 {{
+  "industry": "行业类型",
+  "sub_industry": "细分行业",
+  "confidence": 0.0到1.0,
+  "tender_summary": "招标文件核心内容的一句话概括",
+  "scoring_criteria": {{
+    "total_score": 100,
+    "dimensions": [
+      {{"name": "技术方案", "weight": 40, "description": "评分标准描述"}},
+      {{"name": "报价", "weight": 30, "description": "..."}},
+      {{"name": "商务资质", "weight": 20, "description": "..."}},
+      {{"name": "服务承诺", "weight": 10, "description": "..."}}
+    ]
+  }},
+  "mandatory_requirements": [
+    "必须满足的要求1（不满足则废标）",
+    "必须满足的要求2"
+  ],
   "dimensions": [
     {{
       "name": "完整性",
       "enabled": true,
       "priority": "高",
-      "focus_areas": ["该行业特有的关注点1", "关注点2", "..."],
-      "section_keywords": ["技术方案", "资质", "..."]
+      "focus_areas": [
+        "根据招标文件的具体要求列出，如：是否响应了第X章的技术规格",
+        "不要泛泛而谈，要具体到招标文件中的条款"
+      ],
+      "section_keywords": ["技术方案", "投标函", "..."]
     }},
     {{
       "name": "合规性",
       "enabled": true,
       "priority": "高",
-      "focus_areas": ["..."],
-      "section_keywords": ["..."]
+      "focus_areas": [
+        "是否提供了招标文件要求的所有资质证书",
+        "是否满足了招标文件规定的格式要求",
+        "..."
+      ],
+      "section_keywords": ["资质", "证书", "..."]
     }},
     {{
       "name": "报价",
       "enabled": true,
       "priority": "中",
-      "focus_areas": ["..."],
+      "focus_areas": [
+        "报价是否在预算范围内",
+        "分项报价是否与总价一致",
+        "..."
+      ],
       "section_keywords": ["报价", "价格", "..."]
     }},
     {{
       "name": "风险",
       "enabled": true,
       "priority": "中",
-      "focus_areas": ["..."],
-      "section_keywords": ["..."]
+      "focus_areas": [
+        "是否存在偏离招标要求的条款",
+        "是否承诺了难以兑现的条件",
+        "..."
+      ],
+      "section_keywords": ["偏离", "承诺", "..."]
     }}
   ],
   "agent_definitions": [
@@ -142,7 +122,7 @@ def build_recipe_generation_prompt(
       "agent_id": "completeness_agent",
       "agent_name": "完整性审核员",
       "dimension": "完整性",
-      "description": "该 Agent 的具体职责描述",
+      "description": "具体职责描述（基于招标文件内容）",
       "skill_id": "completeness"
     }},
     {{
@@ -170,6 +150,12 @@ def build_recipe_generation_prompt(
 }}
 ```
 
-请开始设计："""
+## 重要规则
+1. focus_areas 必须基于招标文件的具体内容，不能是通用模板
+2. mandatory_requirements 必须是招标文件中明确写了"必须"、"否则废标"的要求
+3. scoring_criteria 必须是招标文件中明确的评分规则
+4. 如果招标文件没有明确某项信息，对应字段填空列表或 null
+
+请开始分析："""
 
     return prompt

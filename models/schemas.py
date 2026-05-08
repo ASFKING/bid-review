@@ -59,6 +59,46 @@ class ParsedDocument:
     full_text: str                    # 全文纯文本
     metadata: dict                    # 其他元信息
 
+# ===== 智能层：招标文件分析 =====
+
+@dataclass
+class ScoringDimension:
+    """
+    评分维度——招标文件中定义的一个评分项
+
+    类比：考试大纲里的分值分配——"选择题 30 分，大题 50 分"
+    """
+    name: str                       # 评分维度名，如 "技术方案"
+    weight: int                     # 分值权重，如 40（满分 100）
+    description: str                # 评分标准描述
+
+
+@dataclass
+class ScoringCriteria:
+    """
+    评分标准——招标文件中的完整评分规则
+
+    类比：考试的评分细则
+    """
+    total_score: int                    # 总分，通常 100
+    dimensions: list[ScoringDimension]  # 各评分维度
+
+
+@dataclass
+class TenderAnalysis:
+    """
+    招标文件分析结果——Analyzer 从招标文件中提取的所有信息
+
+    类比：教研组看完考试大纲后的会议纪要
+    """
+    industry: str                       # 行业类型
+    sub_industry: str                   # 细分行业
+    confidence: float                   # 置信度
+    tender_summary: str                 # 招标文件一句话概括
+    scoring_criteria: ScoringCriteria   # 评分标准
+    mandatory_requirements: list[str]   # 必须满足的要求（不满足则废标）
+
+
 # ===== 智能层：审核配方 =====
 
 @dataclass
@@ -96,10 +136,13 @@ class ReviewRecipe:
 
     类比：厨师长看完食材后写的今日菜单
     """
-    industry: str                   # 行业类型，如 "软件"
-    sub_industry: str               # 细分行业，如 "信息系统集成"
-    confidence: float               # 行业判断置信度 0-1
-    dimensions: list[DimensionConfig]      # 审核维度列表
+    industry: str                       # 行业类型，如 "软件"
+    sub_industry: str                   # 细分行业，如 "信息系统集成"
+    confidence: float                   # 行业判断置信度 0-1
+    tender_summary: str                 # 招标文件一句话概括
+    scoring_criteria: ScoringCriteria   # 评分标准
+    mandatory_requirements: list[str]   # 必须满足的要求（不满足则废标）
+    dimensions: list[DimensionConfig]   # 审核维度列表
     agent_definitions: list[AgentDefinition]  # Agent 定义列表
 
 # ===== 智能层：审核结果 =====

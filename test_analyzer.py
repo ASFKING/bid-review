@@ -1,17 +1,20 @@
 # test_analyzer.py
-# 测试 Analyzer Agent——验证行业分析 + 配方生成的完整流程
+# 测试 Analyzer Agent——验证招标文件分析 + 配方生成的完整流程
 #
 # 运行方式：python test_analyzer.py
 #
 # 前置条件：
 # 1. .env 文件中有 DASHSCOPE_API_KEY
-# 2. data/input/ 目录下有一份 .docx 投标文件
+# 2. data/input/ 目录下有两份 .docx 文件：
+#    - 一份招标文件（Analyzer 分析对象）
+#    - 一份投标文件（后续审核对象）
+#
+# 如果只有一份文件，测试会把同一份文件同时当作招标和投标文件使用。
 
 import sys
 import logging
 from pathlib import Path
 
-# 配置日志——INFO 级别，看到关键步骤
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(name)s] %(levelname)s: %(message)s",
@@ -33,33 +36,41 @@ def main():
     from infrastructure.llm_caller import LLMCaller
     from agents.analyzer import Analyzer
 
-    # 查找投标文件
+    # 查找文档文件
     input_dir = Path("data/input")
-    docx_files = list(input_dir.glob("*.docx")) if input_dir.exists() else []
+    docx_files = sorted(input_dir.glob("*.docx")) if input_dir.exists() else []
 
     if not docx_files:
-        logger.error("❌ 找不到投标文件！请把 .docx 文件放到 data/input/ 目录下")
+        logger.error("❌ 找不到文档！请把 .docx 文件放到 data/input/ 目录下")
         sys.exit(1)
 
-    docx_path = docx_files[0]
-    logger.info(f"📄 加载文档：{docx_path.name}")
+    if len(docx_files) == 1:
+        logger.warning("⚠️ 只找到 1 份文件，将同时作为招标文件和投标文件使用")
+        tender_path = docx_files[0]
+        bid_path = docx_files[0]
+    else:
+        # 默认第一份是招标文件，第二份是投标文件
+        tender_path = docx_files[0]
+        bid_path = docx_files[1]
+
+    logger.info(f"📄 招标文件：{tender_path.name}")
+    logger.info(f"📄 投标文件：{bid_path.name}")
 
     # 解析文档
-    loader = DocumentLoader(str(docx_path))
-    document = loader.load()
+    tender_loader = DocumentLoader(str(tender_path))
+    tender_doc = tender_loader.load()
 
-    logger.info(f"✅ 文档加载完成：{len(document.sections)} 个顶级章节")
+    bid_loader = DocumentLoader(str(bid_path))
+    bid_doc = bid_loader.load()
 
-    # 显示章节标题
-    logger.info("\n📋 文档章节结构：")
-    _print_sections(document.sections, indent=2)
+    logger.info(f"✅ 招标文件：{len(tender_doc.sections)} 个章节")
+    logger.info(f"✅ 投标文件：{len(bid_doc.sections)} 个章节")
 
     # ===== 第二步：创建 Analyzer =====
     logger.info("\n" + "=" * 50)
     logger.info("第二步：创建 Analyzer Agent")
     logger.info("=" * 50)
 
-    # 用推理模型（分析需要动脑子）
     llm = get_reasoning_llm()
     llm_caller = LLMCaller(llm, agent_name="Analyzer", stage="analysis")
     analyzer = Analyzer(llm_caller)
@@ -68,10 +79,10 @@ def main():
 
     # ===== 第三步：执行分析 =====
     logger.info("\n" + "=" * 50)
-    logger.info("第三步：执行行业分析 + 配方生成")
+    logger.info("第三步：分析招标文件，生成审核配方")
     logger.info("=" * 50)
 
-    recipe = analyzer.analyze(document)
+    recipe = analyzer.analyze(tender_doc, bid_doc)
 
     # ===== 第四步：输出结果 =====
     logger.info("\n" + "=" * 50)
@@ -82,6 +93,15 @@ def main():
     logger.info(f"   行业：{recipe.industry}")
     logger.info(f"   细分：{recipe.sub_industry}")
     logger.info(f"   置信度：{recipe.confidence}")
+    logger.info(f"   招标概括：{recipe.tender_summary}")
+
+    logger.info(f"\n📊 评分标准（总分 {recipe.scoring_criteria.total_score}）：")
+    for sd in recipe.scoring_criteria.dimensions:
+        logger.info(f"   [{sd.weight}分] {sd.name}: {sd.description}")
+
+    logger.info(f"\n⚠️ 必须满足的要求（{len(recipe.mandatory_requirements)} 条）：")
+    for req in recipe.mandatory_requirements:
+        logger.info(f"   - {req}")
 
     logger.info(f"\n📐 审核维度（{len(recipe.dimensions)} 个）：")
     for dim in recipe.dimensions:
@@ -97,14 +117,6 @@ def main():
         logger.info(f"       Skill：{agent_def.skill_id}")
 
     logger.info("\n✅ 测试完成！")
-
-
-def _print_sections(sections, indent=0):
-    """递归打印章节树"""
-    for section in sections:
-        logger.info(f"{' ' * indent}├─ {section.title}")
-        if section.children:
-            _print_sections(section.children, indent + 2)
 
 
 if __name__ == "__main__":

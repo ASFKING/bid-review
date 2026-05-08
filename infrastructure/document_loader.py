@@ -342,25 +342,37 @@ def print_section_tree(sections: list[Section], indent: int = 0) -> None:
 
 def _collect_full_text(sections: list[Section]) -> str:
     """
-    递归收集所有章节的正文文本，拼成一份完整的全文
+    递归收集所有章节的正文 + 表格数据，拼成一份完整的全文
 
-    生活比喻：把目录树里每一页的内容按顺序抄到一张长纸上
+    生活比喻：把目录树里每一页的内容（包括表格）按顺序抄到一张长纸上
 
     为什么需要？后面 LLM 做行业分析时需要看全文，
     而且 ParsedDocument 也需要 full_text 字段。
+
+    为什么表格也要收进来？
+    标书里最值钱的信息往往在表格里：评分标准表、技术参数表、报价清单……
+    如果只收正文段落，LLM 看到的就是"缺了半本书"的残缺版。
 
     参数：
         sections: 章节树（可能有嵌套的 children）
 
     返回：
-        拼接后的全文文本
+        拼接后的全文文本（含正文 + 表格）
     """
     parts = []
     for section in sections:
-        # 加上这个章节的正文
+        # 1. 加上这个章节的正文
         if section.content.strip():
             parts.append(section.content)
-        # 递归收集子章节的正文
+
+        # 2. 加上这个章节的表格数据（之前遗漏的关键信息！）
+        for table in section.tables:
+            if table.as_text.strip():
+                # 加上表格位置标注，让 LLM 知道这个表格在哪
+                parts.append(f"\n[表格 - {table.location}]")
+                parts.append(table.as_text)
+
+        # 3. 递归收集子章节的内容
         if section.children:
             parts.append(_collect_full_text(section.children))
     return "\n".join(parts)

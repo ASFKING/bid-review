@@ -118,11 +118,11 @@ class LLMCaller:
 
                 # ===== 核心调用 =====
                 # LlamaIndex 的 LLM 对象有 .complete() 方法
-                # 我们用 complete 而不是 chat，因为审核任务是单轮对话
-                response = self._llm.complete(prompt)
-
-                # 提取文本内容
-                result_text = response.text.strip()
+                # 流式调用：逐块接收，避免长响应导致连接超时
+                last_text = ""
+                for token in self._llm.stream_complete(prompt):
+                    last_text = token.text  # 每次覆盖，最后留下的就是完整结果
+                result_text = last_text.strip()
 
                 # ===== 检查空结果 =====
                 if not result_text:
@@ -221,7 +221,10 @@ class LLMCaller:
 
         if raw_text is None:
             return None
-
+        # ===== 新增：清洗 LLM 返回的 JSON 文本 =====
+        # LLM 经常在 JSON 字符串值里嵌入裸换行符，这违反 JSON 标准
+        # 我们在解析前先把它们修掉
+        raw_text = self._clean_json_text(raw_text)
         # 第二步：尝试直接解析
         try:
             return json.loads(raw_text)
@@ -257,6 +260,74 @@ class LLMCaller:
         )
 
         return None
+    def _clean_json_text(self, text: str) -> str:
+        """
+        清洗 LLM 返回的 JSON 文本，修复常见的格式问题
+
+        生活比喻：收到一封手写信，先把潦草的字迹描清楚再读
+
+        LLM 最常犯的错误：
+        1. 字符串值里嵌入裸换行符（应该用 \\n 转义）
+        2. 字符串值里嵌入裸制表符（应该用 \\t 转义）
+        3. JSON 前后夹带非 JSON 文本（如 "以下是结果：{...}以上是"）
+
+        参数：
+            text: LLM 返回的原始文本
+
+        返回：
+            清洗后的文本，可以直接 json.loads()
+        """
+        # 先提取 JSON 部分（去掉 LLM 可能夹带的前后废话）
+        match = re.search(r'\{[\s\S]*\}', text)
+        if match:
+            text = match.group()
+        # 修复字符串值里的裸换行符
+        # 思路：找到所有被双引号包裹的字符串，在字符串内部把真实换行符转义
+        # 这里用一个简化方案：逐字符扫描
+        result = []
+        in_string = False
+        escape_next = False
+        i = 0
+        while i < len(text):
+            ch = text[i]
+
+            if escape_next:
+                # 上一个字符是 \，当前字符是转义的一部分，直接保留
+                result.append(ch)
+                escape_next = False
+                i += 1
+                continue
+
+            if ch == '\\' and in_string:
+                # 转义符，下一个字符要保留原样
+                result.append(ch)
+                escape_next = True
+                i += 1
+                continue
+
+            if ch == '"':
+                # 引号：切换"是否在字符串内"的状态
+                in_string = not in_string
+                result.append(ch)
+                i += 1
+                continue
+
+            if in_string and ch == '\n':
+                # 在字符串内部的裸换行符 → 替换为转义的 \\n
+                result.append('\\n')
+                i += 1
+                continue
+
+            if in_string and ch == '\t':
+                # 在字符串内部的裸制表符 → 替换为转义的 \\t
+                result.append('\\t')
+                i += 1
+                continue
+
+            # 其他字符，原样保留
+            result.append(ch)
+            i += 1
+        return text
 
     def call_json_list(self, prompt: str) -> Optional[list]:
         """

@@ -121,7 +121,7 @@ class ReviewAgent:
             section_content=section.content,
             global_rules=global_rules,
         )
-
+        print(prompt)
         logger.info(f"[{self._agent_name}] 开始审核章节：{section.title[:50]}...")
 
         # ---- 第二步：调用 LLM，拿到 dict ----

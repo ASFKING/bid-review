@@ -190,11 +190,11 @@ if __name__ == "__main__":
     print("🦞 Step 3.4 结构化输出测试")
     print("=" * 60)
 
-    # 测试 1：Prompt 生成（不需要 API）
-    test_prompt_generation()
+    # # 测试 1：Prompt 生成（不需要 API）
+    # test_prompt_generation()
 
-    # 测试 2：模拟 JSON 解析（不需要 API）
-    test_mock_parsing()
+    # # 测试 2：模拟 JSON 解析（不需要 API）
+    # test_mock_parsing()
 
     # 测试 3：真实 LLM 调用（需要 API Key）
     test_real_llm()

@@ -121,7 +121,9 @@ class ReviewAgent:
             section_content=section.content,
             global_rules=global_rules,
         )
-        print(prompt)
+        # 默认用 debug 级别，避免全文审核时输出过多
+        # 需要调试时，在日志配置中把级别改为 DEBUG 即可
+        logger.debug(prompt)
         logger.info(f"[{self._agent_name}] 开始审核章节：{section.title[:50]}...")
 
         # ---- 第二步：调用 LLM，拿到 dict ----
